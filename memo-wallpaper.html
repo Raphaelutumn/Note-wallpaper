@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>备忘录壁纸</title>
+<style>
+  :root {
+    --bg: #fffcf5;
+    --grid-color: #e8e4d8;
+    --axis-color: #d4cba8;
+    --text: #8a8060;
+    --text-bright: #5a4a20;
+    --accent: #b48c32;
+    --red: #c8323c;
+    --red-glow: rgba(200,50,60,0.45);
+    --blue: #328cdc;
+    --blue-glow: rgba(50,140,220,0.45);
+    --green: #28b448;
+    --green-glow: rgba(40,180,72,0.45);
+    --white-dot: #b4afaa;
+    --panel-bg: rgba(255,252,245,0.98);
+    --panel-border: #d8d0b8;
+    --input-bg: #faf7ee;
+    --input-border: #d8d0b8;
+    --btn-bg: #e8e0c8;
+    --btn-hover: #d8cfa0;
+    --danger: #c84040;
+    --danger-hover: #e05050;
+    --gold: #b48c32;
+    --gold-light: #c8b060;
+    --gold-dark: #8a6018;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+    height: 100vh;
+    width: 100vw;
+    cursor: default;
+    color: var(--text-bright);
+  }
+
+  canvas#grid { display: block; position: absolute; top: 0; left: 0; z-index: 1; }
+
+  /* Tooltip */
+  #tooltip {
+    position: absolute;
+    z-index: 10;
+    background: rgba(255,252,245,0.97);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text-bright);
+    font-size: 13px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    max-width: 260px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    line-height: 1.5;
+  }
+  #tooltip.visible { opacity: 1; }
+  #tooltip .tt-name { font-size: 15px; font-weight: 600; margin-bottom: 4px; color: #3a2010; }
+  #tooltip .tt-desc { color: #888; font-size: 12px; margin-top: 2px; }
+  #tooltip .tt-deadline { color: #c08030; font-size: 11px; margin-top: 4px; }
+  #tooltip .tt-score { font-size: 11px; margin-top: 2px; }
+
+  /* Overlap selection popup */
+  #overlap-popup {
+    position: absolute;
+    z-index: 20;
+    background: rgba(255,252,245,0.98);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 8px 0;
+    color: var(--text-bright);
+    font-size: 13px;
+    pointer-events: none;
+    opacity: 0;
+    transform: scale(0.9);
+    transition: opacity 0.15s, transform 0.15s;
+    min-width: 180px;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.15);
+  }
+  #overlap-popup.visible { opacity: 1; transform: scale(1); pointer-events: auto; }
+  #overlap-popup .op-header {
+    padding: 6px 14px 8px;
+    font-size: 11px;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    border-bottom: 1px solid var(--panel-border);
+    margin-bottom: 4px;
+  }
+  #overlap-popup .op-item {
+    padding: 8px 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.1s;
+  }
+  #overlap-popup .op-item:hover { background: rgba(0,0,0,0.04); }
+  #overlap-popup .op-dot {
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+  }
+  #overlap-popup .op-name { flex: 1; }
+  #overlap-popup .op-score { color: #999; font-size: 11px; }
+
+  /* Editor panel */
+  #editor-overlay {
+    position: absolute;
+    z-index: 30;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.2);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  #editor-overlay.visible { opacity: 1; pointer-events: auto; }
+
+  #editor-panel {
+    position: absolute;
+    z-index: 31;
+    top: 0; right: -440px;
+    width: 420px;
+    height: 100vh;
+    background: var(--panel-bg);
+    border-left: 1px solid var(--panel-border);
+    transition: right 0.3s cubic-bezier(0.22, 0.61, 0.36, 1);
+    display: flex;
+    flex-direction: column;
+    box-shadow: -4px 0 30px rgba(0,0,0,0.1);
+  }
+  #editor-panel.open { right: 0; }
+
+  #editor-panel .panel-header {
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--panel-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  #editor-panel .panel-header h2 {
+    font-size: 18px; font-weight: 600; color: var(--gold-dark);
+  }
+  #editor-panel .panel-close {
+    background: none; border: 1px solid var(--panel-border);
+    color: var(--text); width: 32px; height: 32px;
+    border-radius: 8px; cursor: pointer; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s;
+  }
+  #editor-panel .panel-close:hover { background: var(--btn-bg); }
+
+  #editor-panel .panel-body {
+    flex: 1; overflow-y: auto; padding: 16px 20px;
+  }
+  #editor-panel .panel-body::-webkit-scrollbar { width: 6px; }
+  #editor-panel .panel-body::-webkit-scrollbar-track { background: transparent; }
+  #editor-panel .panel-body::-webkit-scrollbar-thumb { background: #d8d0b8; border-radius: 3px; }
+
+  /* Event list in editor */
+  .event-list-item {
+    background: rgba(0,0,0,0.02);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: border-color 0.15s;
+  }
+  .event-list-item:hover { border-color: #b8a870; }
+  .event-list-item .eli-dot {
+    width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+    box-shadow: 0 0 6px var(--glow-color, transparent);
+  }
+  .event-list-item .eli-info { flex: 1; min-width: 0; }
+  .event-list-item .eli-abbr { font-weight: 600; color: #3a2010; font-size: 14px; }
+  .event-list-item .eli-full { color: #999; font-size: 12px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .event-list-item .eli-coords { color: #999; font-size: 11px; margin-top: 2px; }
+  .event-list-item .eli-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .event-list-item .eli-actions button {
+    background: var(--btn-bg); border: none; color: var(--text);
+    padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12px;
+    transition: background 0.15s;
+  }
+  .event-list-item .eli-actions button:hover { background: var(--btn-hover); }
+  .event-list-item .eli-actions button.del:hover { background: var(--danger); color: #fff; }
+
+  /* Form */
+  .form-group {
+    margin-bottom: 14px;
+  }
+  .form-group label {
+    display: block; font-size: 12px; color: #b09050;
+    margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .form-group input, .form-group textarea {
+    width: 100%; background: var(--input-bg);
+    border: 1px solid var(--input-border); border-radius: 8px;
+    padding: 10px 12px; color: var(--text-bright); font-size: 14px;
+    font-family: inherit; outline: none;
+    transition: border-color 0.15s;
+  }
+  .form-group input:focus, .form-group textarea:focus { border-color: var(--accent); }
+  .form-group textarea { resize: vertical; min-height: 60px; }
+  .form-row { display: flex; gap: 12px; }
+  .form-row .form-group { flex: 1; }
+
+  .form-actions {
+    display: flex; gap: 10px; margin-top: 20px;
+  }
+  .form-actions button {
+    flex: 1; padding: 10px; border-radius: 8px; border: none;
+    cursor: pointer; font-size: 14px; font-weight: 500;
+    transition: background 0.15s;
+  }
+  .btn-save { background: var(--accent); color: #fff; }
+  .btn-save:hover { background: #c89838; }
+  .btn-cancel { background: var(--btn-bg); color: var(--text); }
+  .btn-cancel:hover { background: var(--btn-hover); }
+
+  #add-event-btn {
+    width: 100%; padding: 10px; border-radius: 8px; border: 1px dashed var(--panel-border);
+    background: transparent; color: #b09050; cursor: pointer; font-size: 13px;
+    margin-bottom: 16px; transition: border-color 0.15s, color 0.15s;
+  }
+  #add-event-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  #edit-form-section {
+    display: none;
+    background: rgba(0,0,0,0.015);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  #edit-form-section.visible { display: block; }
+
+  .form-section-title {
+    font-size: 13px; color: #b09050; margin-bottom: 14px;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+
+  /* Hint — bottom-right corner */
+  #hint {
+    position: absolute; bottom: 16px; right: 24px;
+    z-index: 5; color: #d2be91; font-size: 12px;
+    transition: opacity 0.5s;
+    pointer-events: none;
+  }
+
+  /* Export/Import bar */
+  .io-bar {
+    padding: 14px 20px; border-top: 1px solid var(--panel-border);
+    display: flex; gap: 8px;
+  }
+  .io-bar button {
+    flex: 1; padding: 8px; border-radius: 6px; border: 1px solid var(--panel-border);
+    background: transparent; color: #b09050; cursor: pointer; font-size: 12px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .io-bar button:hover { background: var(--btn-bg); color: var(--gold-dark); }
+</style>
+</head>
+<body>
+
+<canvas id="grid"></canvas>
+
+<div id="tooltip">
+  <div class="tt-name"></div>
+  <div class="tt-desc"></div>
+  <div class="tt-deadline"></div>
+  <div class="tt-score"></div>
+</div>
+
+<div id="overlap-popup">
+  <div class="op-header">此处多个事件</div>
+  <div id="overlap-list"></div>
+</div>
+
+<div id="editor-overlay"></div>
+<div id="editor-panel">
+  <div class="panel-header">
+    <h2>备忘录编辑</h2>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span id="conn-status" style="font-size:11px;color:#c8b878;">检测中...</span>
+      <button id="btn-refresh-wp" style="background:var(--btn-bg);border:none;color:var(--gold);padding:4px 8px;border-radius:4px;cursor:pointer;font-size:11px;" title="立即刷新壁纸">🖼 刷新壁纸</button>
+      <button class="panel-close" title="关闭 (双击空白处也可关闭)">✕</button>
+    </div>
+  </div>
+  <div class="panel-body">
+    <button id="add-event-btn">+ 添加新事件</button>
+    <div id="edit-form-section">
+      <div class="form-section-title" id="form-title">添加事件</div>
+      <div class="form-group">
+        <label>事件简称 *</label>
+        <input type="text" id="f-abbr" placeholder="显示在圆点上的文字" maxlength="6">
+      </div>
+      <div class="form-group">
+        <label>事件全称</label>
+        <input type="text" id="f-fullname" placeholder="事件的完整名称">
+      </div>
+      <div class="form-group">
+        <label>简要描述</label>
+        <textarea id="f-desc" placeholder="事件的简要描述"></textarea>
+      </div>
+      <div class="form-group">
+        <label>截止时间</label>
+        <input type="datetime-local" id="f-deadline">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>紧迫度 (1-20)</label>
+          <input type="number" id="f-urgency" min="1" max="20" value="10">
+        </div>
+        <div class="form-group">
+          <label>重要度 (1-20)</label>
+          <input type="number" id="f-importance" min="1" max="20" value="10">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn-save" id="btn-save">保存</button>
+        <button class="btn-cancel" id="btn-cancel">取消</button>
+      </div>
+    </div>
+    <div id="event-list"></div>
+  </div>
+  <div class="io-bar">
+    <button id="btn-export">导出 JSON</button>
+    <button id="btn-import">导入 JSON</button>
+    <button id="btn-clear">清空全部</button>
+  </div>
+</div>
+
+<div id="hint">双击空白处编辑 · 右键事件快捷操作</div>
+
+<script>
+// ==================== CONSTANTS ====================
+const STORAGE_KEY = 'memo-wallpaper-events';
+const API_BASE = 'http://127.0.0.1:8899';
+const SCORE_MIN = 2, SCORE_MAX = 40;
+
+function getColor(total) {
+  if (total >= 28) return 'red';
+  if (total >= 20) return 'blue';
+  if (total >= 12) return 'green';
+  return 'white';
+}
+
+const COLOR_MAP = {
+  red:    { fill: '#d56067', glow: 'rgba(213,96,103,0.45)',  css: '#d56067' },
+  blue:   { fill: '#61a6e2', glow: 'rgba(97,166,226,0.45)', css: '#61a6e2' },
+  green:  { fill: '#59c570', glow: 'rgba(89,197,112,0.45)',  css: '#59c570' },
+  white:  { fill: '#c5c1bb', glow: 'rgba(197,193,187,0.3)',css: '#c5c1bb' },
+};
+
+// ==================== EVENT STORE (localStorage + API sync) ====================
+class EventStore {
+  constructor() {
+    this.events = [];
+    this.listeners = [];
+    this.connected = false;
+    this._checkConnection().then(() => this.load());
+    this.setupCrossTabSync();
+  }
+
+  async _checkConnection() {
+    try {
+      const resp = await fetch(API_BASE + '/api/ping', { signal: AbortSignal.timeout(2000) });
+      this.connected = resp.ok;
+    } catch {
+      this.connected = false;
+    }
+    this.notify();
+  }
+
+  async load() {
+    if (this.connected) {
+      try {
+        const resp = await fetch(API_BASE + '/api/events');
+        if (resp.ok) {
+          this.events = await resp.json();
+          this.events.sort((a,b) => a.createdAt - b.createdAt);
+          // Mirror to localStorage
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(this.events));
+          this.notify();
+          return;
+        }
+      } catch { this.connected = false; }
+    }
+    // Fallback: localStorage
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      this.events = raw ? JSON.parse(raw) : [];
+    } catch(e) {
+      this.events = [];
+    }
+    this.events.sort((a,b) => a.createdAt - b.createdAt);
+    this.notify();
+  }
+
+  save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(this.events));
+    this.notify();
+  }
+
+  async add(ev) {
+    ev.id = Date.now().toString(36) + Math.random().toString(36).slice(2,6);
+    ev.createdAt = Date.now();
+    this.events.push(ev);
+    this.events.sort((a,b) => a.createdAt - b.createdAt);
+
+    if (this.connected) {
+      try {
+        const resp = await fetch(API_BASE + '/api/events', {
+          method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(ev)
+        });
+        if (resp.ok) {
+          const saved = await resp.json();
+          ev.id = saved.id; ev.createdAt = saved.createdAt;
+        }
+      } catch { this.connected = false; }
+    }
+    this.save();
+    return ev;
+  }
+
+  async update(id, data) {
+    const idx = this.events.findIndex(e => e.id === id);
+    if (idx === -1) return null;
+    Object.assign(this.events[idx], data);
+    this.events.sort((a,b) => a.createdAt - b.createdAt);
+
+    if (this.connected) {
+      try {
+        await fetch(API_BASE + '/api/events/' + encodeURIComponent(id), {
+          method: 'PUT', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(this.events[idx])
+        });
+      } catch { this.connected = false; }
+    }
+    this.save();
+    return this.events[idx];
+  }
+
+  async delete(id) {
+    this.events = this.events.filter(e => e.id !== id);
+
+    if (this.connected) {
+      try {
+        await fetch(API_BASE + '/api/events/' + encodeURIComponent(id), { method: 'DELETE' });
+      } catch { this.connected = false; }
+    }
+    this.save();
+  }
+
+  clearAll() {
+    this.events = [];
+    this.save();
+  }
+
+  importData(events) {
+    this.events = events.map(e => ({
+      ...e,
+      id: e.id || (Date.now().toString(36) + Math.random().toString(36).slice(2,6)),
+      createdAt: e.createdAt || Date.now()
+    }));
+    this.events.sort((a,b) => a.createdAt - b.createdAt);
+    this.save();
+  }
+
+  getAtPosition(urgency, importance) {
+    return this.events
+      .filter(e => e.urgency === urgency && e.importance === importance)
+      .sort((a,b) => a.createdAt - b.createdAt);
+  }
+
+  onUpdate(fn) { this.listeners.push(fn); }
+  notify() { this.listeners.forEach(fn => fn()); }
+
+  setupCrossTabSync() {
+    window.addEventListener('storage', (e) => {
+      if (e.key === STORAGE_KEY) {
+        this.load();
+      }
+    });
+  }
+}
+
+// ==================== GRID RENDERER ====================
+class GridRenderer {
+  constructor(canvas, store) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.store = store;
+    this.dpr = window.devicePixelRatio || 1;
+
+    // Layout
+    this.margin = { top: 50, right: 30, bottom: 55, left: 65 };
+    this.gridRange = { min: 1, max: 20 };
+    this.dotRadius = 15;
+    this.hoveredEvent = null;
+    this.resize();
+  }
+
+  resize() {
+    this.canvas.width = window.innerWidth * this.dpr;
+    this.canvas.height = window.innerHeight * this.dpr;
+    this.canvas.style.width = window.innerWidth + 'px';
+    this.canvas.style.height = window.innerHeight + 'px';
+    this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+
+    this.gridW = window.innerWidth - this.margin.left - this.margin.right;
+    this.gridH = window.innerHeight - this.margin.top - this.margin.bottom;
+    this.cellW = this.gridW / (this.gridRange.max - this.gridRange.min);
+    this.cellH = this.gridH / (this.gridRange.max - this.gridRange.min);
+    this.cellSize = Math.min(this.cellW, this.cellH);
+    this.gridW = this.cellSize * (this.gridRange.max - this.gridRange.min);
+    this.gridH = this.cellSize * (this.gridRange.max - this.gridRange.min);
+  }
+
+  gridToPixel(urgency, importance) {
+    const x = this.margin.left + (urgency - this.gridRange.min) * this.cellSize;
+    const y = this.margin.top + (this.gridRange.max - importance) * this.cellSize;
+    return { x, y };
+  }
+
+  pixelToGrid(px, py) {
+    const u = Math.round((px - this.margin.left) / this.cellSize + this.gridRange.min);
+    const i = Math.round(this.gridRange.max - (py - this.margin.top) / this.cellSize);
+    if (u < 1 || u > 20 || i < 1 || i > 20) return null;
+    return { urgency: u, importance: i };
+  }
+
+  getEventAtPixel(px, py) {
+    const grid = this.pixelToGrid(px, py);
+    if (!grid) return null;
+    const events = this.store.getAtPosition(grid.urgency, grid.importance);
+    if (events.length === 0) return null;
+    const { x, y } = this.gridToPixel(grid.urgency, grid.importance);
+    const dist = Math.hypot(px - x, py - y);
+    if (dist > this.dotRadius + 8) return null;
+    return { events, x, y, urgency: grid.urgency, importance: grid.importance };
+  }
+
+  render() {
+    const ctx = this.ctx;
+    const w = window.innerWidth, h = window.innerHeight;
+    ctx.clearRect(0, 0, w, h);
+
+    this.drawBackground(ctx, w, h);
+    this.drawGrid(ctx);
+    this.drawEvents(ctx);
+    this.drawTitle(ctx);
+  }
+
+  drawBackground(ctx, w, h) {
+    ctx.fillStyle = '#fffcf5';
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  drawGrid(ctx) {
+    const { margin, gridRange, cellSize } = this;
+    const left = margin.left, top = margin.top;
+    const rows = gridRange.max - gridRange.min;
+
+    // Grid lines — light warm gray
+    ctx.strokeStyle = '#e4dfd2';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i <= rows; i++) {
+      const x = left + i * cellSize;
+      const y = top + i * cellSize;
+      ctx.beginPath(); ctx.moveTo(x, top); ctx.lineTo(x, top + rows * cellSize); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(left + rows * cellSize, y); ctx.stroke();
+    }
+
+    // Axes — gold
+    ctx.strokeStyle = '#d4cba8';
+    ctx.lineWidth = 2;
+    const xAxisY = top + rows * cellSize;
+    ctx.beginPath(); ctx.moveTo(left, top); ctx.lineTo(left, xAxisY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(left, xAxisY); ctx.lineTo(left + rows * cellSize, xAxisY); ctx.stroke();
+
+    // Arrow heads — gold
+    ctx.fillStyle = '#d4cba8';
+    ctx.beginPath(); ctx.moveTo(left, top - 8); ctx.lineTo(left - 5, top + 2); ctx.lineTo(left + 5, top + 2); ctx.fill();
+    const rightX = left + rows * cellSize;
+    ctx.beginPath(); ctx.moveTo(rightX + 8, xAxisY); ctx.lineTo(rightX - 2, xAxisY - 5); ctx.lineTo(rightX - 2, xAxisY + 5); ctx.fill();
+
+    // Axis labels — gold
+    ctx.fillStyle = '#c8b060';
+    ctx.font = '11px "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    for (let i = gridRange.min; i <= gridRange.max; i++) {
+      if (i % 2 === 1 && i !== 1 && i !== 20) continue;
+      const x = left + (i - gridRange.min) * cellSize;
+      ctx.fillText(i, x, xAxisY + 20);
+    }
+    ctx.textAlign = 'right';
+    for (let i = gridRange.min; i <= gridRange.max; i++) {
+      if (i % 2 === 1 && i !== 1 && i !== 20) continue;
+      const y = top + (gridRange.max - i) * cellSize + 4;
+      ctx.fillText(i, left - 10, y);
+    }
+
+    // Axis titles — gold
+    ctx.fillStyle = '#b48c32';
+    ctx.font = '13px "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('紧迫度 →', left + rows * cellSize / 2, xAxisY + 42);
+    ctx.save();
+    ctx.translate(16, top + rows * cellSize / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText('重要度 →', 0, 0);
+    ctx.restore();
+  }
+
+  drawEvents(ctx) {
+    const { cellSize, dotRadius } = this;
+    if (cellSize < 8) return; // too small to draw
+
+    // Group events by position
+    const posMap = new Map();
+    for (const ev of this.store.events) {
+      const key = `${ev.urgency},${ev.importance}`;
+      if (!posMap.has(key)) posMap.set(key, []);
+      posMap.get(key).push(ev);
+    }
+
+    // Draw each position
+    for (const [key, events] of posMap) {
+      const [u, i] = key.split(',').map(Number);
+      const { x, y } = this.gridToPixel(u, i);
+      const count = events.length;
+
+      // Draw stacked dots (first created = top = drawn last)
+      const sorted = [...events].sort((a,b) => b.createdAt - a.createdAt); // newest first → oldest drawn last (on top)
+
+      for (let idx = 0; idx < sorted.length; idx++) {
+        const ev = sorted[idx];
+        const offsetX = count > 1 ? (idx - (count-1)/2) * 3 : 0;
+        const offsetY = count > 1 ? (idx - (count-1)/2) * 3 : 0;
+        const cx = x + offsetX;
+        const cy = y + offsetY;
+
+        const total = ev.urgency + ev.importance;
+        const color = getColor(total);
+        const colors = COLOR_MAP[color];
+
+        // Dot body — solid color
+        ctx.fillStyle = colors.fill;
+        ctx.beginPath(); ctx.arc(cx, cy, dotRadius, 0, Math.PI * 2); ctx.fill();
+
+        // Gold border
+        ctx.strokeStyle = '#b48c32';
+        ctx.lineWidth = Math.max(1.5, this.cellSize / 50);
+        ctx.beginPath(); ctx.arc(cx, cy, dotRadius, 0, Math.PI * 2); ctx.stroke();
+
+        // Abbreviation text — pure black, 1-3 chars single line, 4-6 split into two lines, unified font
+        if (ev.abbreviation && cellSize > 20) {
+          const abbr = ev.abbreviation.trim();
+          const fontSize = Math.max(24, Math.min(34, cellSize * 0.7));
+          ctx.fillStyle = '#000';
+          ctx.font = `900 ${fontSize}px "KaiTi", "STKaiti", "华文楷体", "楷体", serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          if (abbr.length <= 3) {
+            ctx.fillText(abbr, cx, cy);
+            ctx.fillText(abbr, cx + 0.5, cy);
+          } else {
+            const split = Math.ceil(abbr.length / 2);
+            const lineH = dotRadius * 0.48;
+            ctx.fillText(abbr.slice(0, split), cx, cy - lineH);
+            ctx.fillText(abbr.slice(0, split), cx + 0.5, cy - lineH);
+            ctx.fillText(abbr.slice(split), cx, cy + lineH);
+            ctx.fillText(abbr.slice(split), cx + 0.5, cy + lineH);
+          }
+        }
+      }
+
+      // Overlap badge — gold
+      if (count > 1) {
+        const badgeX = x + dotRadius + 2;
+        const badgeY = y - dotRadius - 2;
+        ctx.fillStyle = '#dcb428';
+        ctx.beginPath(); ctx.arc(badgeX, badgeY, 9, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 10px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(count, badgeX, badgeY);
+      }
+    }
+  }
+
+  drawTitle(ctx) {
+    // Layered text for depth — solid colors matching wallpaper renderer
+    ctx.font = 'bold 28px "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#d2be91';
+    ctx.fillText('事 件 备 忘', 31, 39);
+    ctx.fillStyle = '#aa7823';
+    ctx.fillText('事 件 备 忘', 30, 38);
+
+    // Clock — solid gold
+    const now = new Date();
+    const timeStr = now.toLocaleString('zh-CN', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    const dateStr = now.toLocaleDateString('zh-CN', { year:'numeric', month:'2-digit', day:'2-digit', weekday:'short' });
+    ctx.fillStyle = '#b48c32';
+    ctx.font = '14px "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(timeStr, window.innerWidth - 30, 28);
+    ctx.fillStyle = '#c8aa64';
+    ctx.font = '12px "Microsoft YaHei", sans-serif';
+    ctx.fillText(dateStr, window.innerWidth - 30, 45);
+  }
+}
+
+// ==================== APP CONTROLLER ====================
+class App {
+  constructor() {
+    this.store = new EventStore();
+    this.canvas = document.getElementById('grid');
+    this.renderer = new GridRenderer(this.canvas, this.store);
+    this.tooltip = document.getElementById('tooltip');
+    this.overlapPopup = document.getElementById('overlap-popup');
+    this.overlapList = document.getElementById('overlap-list');
+    this.editorOverlay = document.getElementById('editor-overlay');
+    this.editorPanel = document.getElementById('editor-panel');
+    this.editFormSection = document.getElementById('edit-form-section');
+    this.formTitle = document.getElementById('form-title');
+    this.eventList = document.getElementById('event-list');
+    this.hint = document.getElementById('hint');
+
+    this.editingId = null; // null = adding, string = editing
+    this.editorOpen = false;
+
+    this.init();
+  }
+
+  init() {
+    this.connStatus = document.getElementById('conn-status');
+    this.bindEvents();
+    this.store.onUpdate(() => {
+      this.refresh();
+      this.updateConnStatus();
+    });
+    this.store._checkConnection().then(() => {
+      this.store.load();
+      this.updateConnStatus();
+    });
+    this.render();
+    this.renderEventList();
+    this.startClock();
+  }
+
+  updateConnStatus() {
+    if (this.store.connected) {
+      this.connStatus.textContent = '● 壁纸引擎已连接';
+      this.connStatus.style.color = '#28a040';
+      document.getElementById('btn-refresh-wp').style.display = '';
+    } else {
+      this.connStatus.textContent = '○ 离线模式';
+      this.connStatus.style.color = '#c8b878';
+      document.getElementById('btn-refresh-wp').style.display = 'none';
+    }
+  }
+
+  bindEvents() {
+    // Canvas interactions
+    this.canvas.addEventListener('mousemove', (e) => this.onMouseMove(e));
+    this.canvas.addEventListener('click', (e) => this.onClick(e));
+    this.canvas.addEventListener('dblclick', (e) => this.onDoubleClick(e));
+    this.canvas.addEventListener('contextmenu', (e) => { e.preventDefault(); this.onRightClick(e); });
+
+    // Window resize
+    window.addEventListener('resize', () => { this.renderer.resize(); this.render(); });
+
+    // Editor panel
+    document.querySelector('.panel-close').addEventListener('click', () => this.closeEditor());
+    this.editorOverlay.addEventListener('click', () => this.closeEditor());
+
+    // Form buttons
+    document.getElementById('add-event-btn').addEventListener('click', () => this.showAddForm());
+    document.getElementById('btn-save').addEventListener('click', () => this.saveEvent());
+    document.getElementById('btn-cancel').addEventListener('click', () => this.hideForm());
+
+    // IO buttons
+    document.getElementById('btn-export').addEventListener('click', () => this.exportData());
+    document.getElementById('btn-import').addEventListener('click', () => this.importData());
+    document.getElementById('btn-clear').addEventListener('click', () => this.confirmClear());
+    document.getElementById('btn-refresh-wp').addEventListener('click', () => this.refreshWallpaper());
+
+    // Keyboard shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (this.editFormSection.classList.contains('visible')) {
+          this.hideForm();
+        } else if (this.editorOpen) {
+          this.closeEditor();
+        }
+        this.hideOverlapPopup();
+      }
+    });
+
+    // Click outside to close overlap popup
+    window.addEventListener('click', (e) => {
+      if (!this.overlapPopup.contains(e.target) && e.target !== this.canvas) {
+        this.hideOverlapPopup();
+      }
+    });
+  }
+
+  render() { this.renderer.render(); }
+  refresh() {
+    this.render();
+    this.renderEventList();
+  }
+
+  startClock() {
+    setInterval(() => this.render(), 1000);
+  }
+
+  // ---- Mouse handlers ----
+  onMouseMove(e) {
+    const hit = this.renderer.getEventAtPixel(e.clientX, e.clientY);
+    if (hit) {
+      this.canvas.style.cursor = 'pointer';
+      this.showTooltip(hit, e.clientX, e.clientY);
+      this.renderer.hoveredEvent = hit;
+    } else {
+      this.canvas.style.cursor = this.editorOpen ? 'default' : 'crosshair';
+      this.hideTooltip();
+      this.renderer.hoveredEvent = null;
+    }
+  }
+
+  onClick(e) {
+    this.hideOverlapPopup();
+    const hit = this.renderer.getEventAtPixel(e.clientX, e.clientY);
+    if (!hit) return;
+
+    if (hit.events.length === 1) {
+      this.showEventDetail(hit.events[0]);
+    } else {
+      this.showOverlapPopup(hit);
+    }
+  }
+
+  onDoubleClick(e) {
+    const hit = this.renderer.getEventAtPixel(e.clientX, e.clientY);
+    if (!hit) {
+      // Double-click empty space -> open editor
+      this.openEditor();
+    }
+  }
+
+  onRightClick(e) {
+    const hit = this.renderer.getEventAtPixel(e.clientX, e.clientY);
+    if (!hit) return;
+    this.hideOverlapPopup();
+
+    if (hit.events.length === 1) {
+      this.openEditor();
+      this.showEditForm(hit.events[0]);
+    } else {
+      this.showOverlapPopup(hit, true); // right-click mode: edit focused
+    }
+  }
+
+  // ---- Tooltip ----
+  showTooltip(hit, mx, my) {
+    const ev = hit.events[0]; // topmost = oldest (first created)
+    const total = ev.urgency + ev.importance;
+    const color = getColor(total);
+
+    this.tooltip.querySelector('.tt-name').textContent = ev.fullName || ev.abbreviation;
+    this.tooltip.querySelector('.tt-desc').textContent = ev.description || '';
+    this.tooltip.querySelector('.tt-deadline').textContent = ev.deadline
+      ? '截止：' + new Date(ev.deadline).toLocaleString('zh-CN')
+      : '';
+    this.tooltip.querySelector('.tt-score').innerHTML =
+      `紧迫 ${ev.urgency} · 重要 ${ev.importance} · 总分 <b style="color:${COLOR_MAP[color].css}">${total}</b>`;
+
+    if (hit.events.length > 1) {
+      this.tooltip.querySelector('.tt-score').innerHTML += ` · <b style="color:#ffd700">+${hit.events.length-1}</b>`;
+    }
+
+    this.tooltip.classList.add('visible');
+    let tx = mx + 18, ty = my - 10;
+    if (tx + 270 > window.innerWidth) tx = mx - 270;
+    if (ty + 120 > window.innerHeight) ty = my - 130;
+    this.tooltip.style.left = tx + 'px';
+    this.tooltip.style.top = ty + 'px';
+  }
+
+  hideTooltip() {
+    this.tooltip.classList.remove('visible');
+  }
+
+  // ---- Overlap popup ----
+  showOverlapPopup(hit, rightClickMode = false) {
+    const { x, y, events } = hit;
+    this.overlapList.innerHTML = '';
+    const sorted = [...events].sort((a,b) => a.createdAt - b.createdAt);
+
+    sorted.forEach(ev => {
+      const total = ev.urgency + ev.importance;
+      const color = getColor(total);
+      const div = document.createElement('div');
+      div.className = 'op-item';
+      div.innerHTML = `
+        <span class="op-dot" style="background:${COLOR_MAP[color].fill}; box-shadow:0 0 6px ${COLOR_MAP[color].glow}"></span>
+        <span class="op-name">${ev.abbreviation || ev.fullName || '(无名称)'}</span>
+        <span class="op-score">${total}分</span>
+      `;
+      div.addEventListener('click', (ee) => {
+        ee.stopPropagation();
+        if (rightClickMode) {
+          this.openEditor();
+          this.showEditForm(ev);
+        } else {
+          this.showEventDetail(ev);
+        }
+        this.hideOverlapPopup();
+      });
+      this.overlapList.appendChild(div);
+    });
+
+    this.overlapPopup.classList.add('visible');
+    let px = x + 20, py = y - 20;
+    if (px + 200 > window.innerWidth) px = x - 200;
+    if (py + this.overlapList.children.length * 40 + 60 > window.innerHeight) py = y - this.overlapList.children.length * 40 - 60;
+    this.overlapPopup.style.left = px + 'px';
+    this.overlapPopup.style.top = py + 'px';
+  }
+
+  hideOverlapPopup() {
+    this.overlapPopup.classList.remove('visible');
+  }
+
+  showEventDetail(ev) {
+    // Show a temporary detailed tooltip or alert-like display
+    const total = ev.urgency + ev.importance;
+    const color = getColor(total);
+    const msg = [
+      `【${ev.abbreviation}】${ev.fullName || ''}`,
+      '',
+      ev.description || '(无描述)',
+      '',
+      `截止：${ev.deadline ? new Date(ev.deadline).toLocaleString('zh-CN') : '无'}`,
+      `紧迫度：${ev.urgency} / 重要度：${ev.importance} / 总分：${total}`
+    ].join('\n');
+    // Use a styled custom "alert" approach — we'll repurpose the tooltip
+    this.tooltip.querySelector('.tt-name').textContent = ev.abbreviation + (ev.fullName ? ' — ' + ev.fullName : '');
+    this.tooltip.querySelector('.tt-desc').textContent = ev.description || '';
+    this.tooltip.querySelector('.tt-deadline').textContent = ev.deadline
+      ? '截止：' + new Date(ev.deadline).toLocaleString('zh-CN')
+      : '';
+    this.tooltip.querySelector('.tt-score').innerHTML =
+      `紧迫 ${ev.urgency} · 重要 ${ev.importance} · 总分 <b style="color:${COLOR_MAP[color].css}">${total}</b>`;
+    this.tooltip.classList.add('visible');
+    // Keep tooltip visible longer
+    clearTimeout(this._ttTimeout);
+    this._ttTimeout = setTimeout(() => { this.hideTooltip(); }, 3000);
+  }
+
+  // ---- Editor panel ----
+  openEditor() {
+    this.editorOpen = true;
+    this.editorOverlay.classList.add('visible');
+    this.editorPanel.classList.add('open');
+    this.hint.style.opacity = '0';
+    this.renderEventList();
+  }
+
+  closeEditor() {
+    this.editorOpen = false;
+    this.editorOverlay.classList.remove('visible');
+    this.editorPanel.classList.remove('open');
+    this.hideForm();
+    this.hint.style.opacity = '1';
+  }
+
+  // ---- Form ----
+  showAddForm() {
+    this.editingId = null;
+    this.formTitle.textContent = '添加事件';
+    document.getElementById('f-abbr').value = '';
+    document.getElementById('f-fullname').value = '';
+    document.getElementById('f-desc').value = '';
+    document.getElementById('f-deadline').value = '';
+    document.getElementById('f-urgency').value = '10';
+    document.getElementById('f-importance').value = '10';
+    this.editFormSection.classList.add('visible');
+    document.getElementById('f-abbr').focus();
+  }
+
+  showEditForm(ev) {
+    this.editingId = ev.id;
+    this.formTitle.textContent = '编辑事件';
+    document.getElementById('f-abbr').value = ev.abbreviation || '';
+    document.getElementById('f-fullname').value = ev.fullName || '';
+    document.getElementById('f-desc').value = ev.description || '';
+    document.getElementById('f-deadline').value = ev.deadline || '';
+    document.getElementById('f-urgency').value = ev.urgency;
+    document.getElementById('f-importance').value = ev.importance;
+    this.editFormSection.classList.add('visible');
+    document.getElementById('f-abbr').focus();
+  }
+
+  hideForm() {
+    this.editFormSection.classList.remove('visible');
+    this.editingId = null;
+  }
+
+  async saveEvent() {
+    const abbr = document.getElementById('f-abbr').value.trim();
+    if (!abbr) {
+      this.shakeField('f-abbr');
+      return;
+    }
+    const urgency = Math.max(1, Math.min(20, parseInt(document.getElementById('f-urgency').value) || 10));
+    const importance = Math.max(1, Math.min(20, parseInt(document.getElementById('f-importance').value) || 10));
+
+    const data = {
+      abbreviation: abbr,
+      fullName: document.getElementById('f-fullname').value.trim(),
+      description: document.getElementById('f-desc').value.trim(),
+      deadline: document.getElementById('f-deadline').value,
+      urgency,
+      importance
+    };
+
+    if (this.editingId) {
+      await this.store.update(this.editingId, data);
+    } else {
+      await this.store.add(data);
+    }
+
+    this.hideForm();
+    this.refresh();
+  }
+
+  shakeField(id) {
+    const el = document.getElementById(id);
+    el.style.borderColor = '#ff4466';
+    el.style.animation = 'none';
+    el.offsetHeight; // reflow
+    el.style.animation = 'shake 0.3s ease';
+    setTimeout(() => { el.style.borderColor = ''; el.style.animation = ''; }, 300);
+  }
+
+  // ---- Event list ----
+  renderEventList() {
+    this.eventList.innerHTML = '';
+    if (this.store.events.length === 0) {
+      this.eventList.innerHTML = '<div style="color:#c8b878;text-align:center;padding:20px;">暂无事件</div>';
+      return;
+    }
+    const sorted = [...this.store.events].sort((a,b) => {
+      const ta = a.urgency + a.importance;
+      const tb = b.urgency + b.importance;
+      return tb - ta; // highest score first
+    });
+
+    sorted.forEach(ev => {
+      const total = ev.urgency + ev.importance;
+      const color = getColor(total);
+      const colors = COLOR_MAP[color];
+
+      const div = document.createElement('div');
+      div.className = 'event-list-item';
+      div.innerHTML = `
+        <div class="eli-dot" style="background:${colors.fill}; --glow-color:${colors.glow}"></div>
+        <div class="eli-info">
+          <div class="eli-abbr">${this.escapeHtml(ev.abbreviation)}${ev.fullName ? ' — ' + this.escapeHtml(ev.fullName) : ''}</div>
+          <div class="eli-coords">紧迫${ev.urgency} · 重要${ev.importance} · 总分${total} · ${ev.deadline ? '截止'+new Date(ev.deadline).toLocaleDateString('zh-CN') : '无截止'}</div>
+        </div>
+        <div class="eli-actions">
+          <button class="edit-btn" data-id="${ev.id}">编辑</button>
+          <button class="del-btn del" data-id="${ev.id}">删除</button>
+        </div>
+      `;
+
+      div.querySelector('.edit-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.showEditForm(ev);
+      });
+      div.querySelector('.del-btn').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        if (confirm(`确定删除事件「${ev.abbreviation}」？`)) {
+          await this.store.delete(ev.id);
+          if (this.editingId === ev.id) this.hideForm();
+          this.refresh();
+        }
+      });
+
+      this.eventList.appendChild(div);
+    });
+  }
+
+  escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // ---- IO ----
+  exportData() {
+    const json = JSON.stringify(this.store.events, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'memo-backup-' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  importData() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.addEventListener('change', () => {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(reader.result);
+          if (!Array.isArray(data)) throw new Error('格式错误');
+          this.store.importData(data);
+          this.refresh();
+        } catch(e) {
+          alert('导入失败：文件格式不正确');
+        }
+      };
+      reader.readAsText(file);
+    });
+    input.click();
+  }
+
+  async refreshWallpaper() {
+    if (!this.store.connected) {
+      alert('壁纸引擎未连接。\n请先运行 wallpaper_engine.py');
+      return;
+    }
+    try {
+      const resp = await fetch(API_BASE + '/api/refresh', { method: 'POST' });
+      if (resp.ok) {
+        this._showToast('壁纸已刷新');
+      }
+    } catch {
+      this._showToast('刷新失败，请检查壁纸引擎');
+      this.store.connected = false;
+      this.updateConnStatus();
+    }
+  }
+
+  _showToast(msg) {
+    const toast = document.createElement('div');
+    toast.textContent = msg;
+    Object.assign(toast.style, {
+      position:'fixed', bottom:'30px', left:'50%', transform:'translateX(-50%)',
+      background:'rgba(60,40,10,0.9)', color:'#f5eed8', padding:'10px 24px',
+      borderRadius:'20px', fontSize:'13px', zIndex:'999',
+      transition:'opacity 0.3s', pointerEvents:'none'
+    });
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; }, 1500);
+    setTimeout(() => { toast.remove(); }, 2000);
+  }
+
+  confirmClear() {
+    if (this.store.events.length === 0) return;
+    if (confirm(`确定清空全部 ${this.store.events.length} 个事件？此操作不可撤销。`)) {
+      this.store.clearAll();
+      this.hideForm();
+      this.refresh();
+    }
+  }
+}
+
+// ==================== INIT ====================
+// Add shake animation
+const style = document.createElement('style');
+style.textContent = `
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    50% { transform: translateX(6px); }
+    75% { transform: translateX(-4px); }
+  }
+`;
+document.head.appendChild(style);
+
+// Boot
+const app = new App();
+
+// Fade hint after 5s
+setTimeout(() => {
+  document.getElementById('hint').style.opacity = '0.2';
+}, 8000);
+</script>
+
+</body>
+</html>

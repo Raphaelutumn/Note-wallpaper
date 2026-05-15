@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+Desktop.ini
+*.lnk
+
+# Runtime data (user memos)
+*.json
+!package.json
+
+# Engine output
+*.bmp
+engine.pid
